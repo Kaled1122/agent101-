@@ -1,19 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import openai
-import datetime
-import json
-import requests
-import os
+import datetime, json, requests, os
+from openai import OpenAI
 
 app = Flask(__name__)
 CORS(app)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# -----------------------------------------
-# TOOLS
-# -----------------------------------------
+# -------------------- TOOLS --------------------
 
 def get_time():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -21,50 +16,41 @@ def get_time():
 def web_search(query):
     url = f"https://api.duckduckgo.com/?q={query}&format=json"
     r = requests.get(url).json()
-    results = []
-    if "RelatedTopics" in r:
-        for item in r["RelatedTopics"][:3]:
-            if "Text" in item:
-                results.append(item["Text"])
-    return results if results else ["No results found"]
+    return [x["Text"] for x in r.get("RelatedTopics", [])[:3]] or ["No results found"]
 
 TOOLS = [
     {
-        "name": "get_time",
-        "description": "Returns the current server time",
-        "parameters": {
-            "type": "object",
-            "properties": {}
-        },
+        "type": "function",
+        "function": {
+            "name": "get_time",
+            "description": "Returns the current time",
+            "parameters": {"type": "object", "properties": {}}
+        }
     },
     {
-        "name": "web_search",
-        "description": "Searches the web and returns results",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string"}
-            },
-            "required": ["query"]
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the web",
+            "parameters": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"]
+            }
         }
     }
 ]
 
+SYSTEM_PROMPT = "You are an AI agent. Use tools when appropriate."
 
-SYSTEM_PROMPT = """
-You are an AI agent. When asked:
-- time → use get_time
-- search/info/google/news → use web_search
-Otherwise answer yourself.
-"""
-
+# -------------------- MAIN ENDPOINT --------------------
 
 @app.route("/chat", methods=["POST"])
 def chat():
     user_msg = request.json.get("message")
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
+    resp = client.chat.completions.create(
+        model="gpt-5.1",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_msg}
@@ -72,24 +58,26 @@ def chat():
         tools=TOOLS
     )
 
-    msg = response.choices[0].message
+    msg = resp.choices[0].message
 
-    if msg.get("tool_calls"):
-        tool = msg["tool_calls"][0]
-        name = tool["function"]["name"]
-        args = json.loads(tool["function"].get("arguments", "{}"))
+    # Tool call?
+    if msg.tool_calls:
+        call = msg.tool_calls[0]
+        fn = call.function.name
+        args = json.loads(call.function.arguments or "{}")
 
-        if name == "get_time":
+        if fn == "get_time":
             return jsonify({"reply": get_time()})
 
-        if name == "web_search":
+        if fn == "web_search":
             return jsonify({"reply": web_search(args["query"])})
 
-    return jsonify({"reply": msg["content"]})
+    # Normal model response
+    return jsonify({"reply": msg.content})
 
 @app.route("/")
 def home():
-    return "🚀 Agent backend running!"
+    return "Agent backend running GPT-5.1"
 
 if __name__ == "__main__":
     app.run(port=int(os.getenv("PORT", 5000)), host="0.0.0.0")
