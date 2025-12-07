@@ -6,6 +6,7 @@ from openai import OpenAI
 app = Flask(__name__)
 CORS(app)
 
+# Make sure OPENAI_API_KEY is set in Railway
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SYSTEM_PROMPT = """
@@ -20,13 +21,28 @@ def get_time():
 
 def web_search(query: str):
     key = os.getenv("SERPAPI_KEY")
-    r = requests.get(
-        "https://serpapi.com/search.json",
-        params={"q": query, "api_key": key}
-    ).json()
+    if not key:
+        return ["❌ SERPAPI_KEY is not set in the environment"]
+
+    try:
+        r = requests.get(
+            "https://serpapi.com/search.json",
+            params={"q": query, "api_key": key},
+            timeout=15
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        print("SERPAPI ERROR:", e, flush=True)
+        return [f"❌ Web search failed: {e}"]
+
     results = []
-    for item in r.get("organic_results", [])[:3]:
-        results.append(f"{item['title']} → {item['link']}")
+    for item in data.get("organic_results", [])[:3]:
+        title = item.get("title")
+        link = item.get("link")
+        if title and link:
+            results.append(f"{title} → {link}")
+
     return results or ["No results found"]
 
 TOOLS = [
@@ -56,32 +72,55 @@ TOOLS = [
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    user_msg = request.json.get("message")
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        user_msg = data.get("message", "").trim() if hasattr(str, "trim") else data.get("message", "").strip()
+        print("INCOMING MESSAGE:", user_msg, flush=True)
 
-    response = client.chat.completions.create(
-        model="gpt-5.1",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_msg}
-        ],
-        tools=TOOLS
-    )
+        if not user_msg:
+            return jsonify({"reply": "Please type a message."})
 
-    msg = response.choices[0].message
+        response = client.chat.completions.create(
+            model="gpt-5.1",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg}
+            ],
+            tools=TOOLS,
+            tool_choice="auto"
+        )
 
-    # TOOL CALL DETECTED
-    if msg.tool_calls:
-        tool = msg.tool_calls[0].function.name
-        args = json.loads(msg.tool_calls[0].function.arguments)
+        msg = response.choices[0].message
+        print("RAW OPENAI MESSAGE:", msg, flush=True)
 
-        if tool == "get_time":
-            return jsonify({"reply": get_time()})
+        # TOOL CALL
+        if msg.tool_calls:
+            tool_call = msg.tool_calls[0]
+            tool_name = tool_call.function.name
+            args_str = tool_call.function.arguments or "{}"
+            print("TOOL CALL:", tool_name, args_str, flush=True)
 
-        if tool == "web_search":
-            return jsonify({"reply": web_search(args["query"])})
+            try:
+                args = json.loads(args_str)
+            except Exception as e:
+                print("ARGS PARSE ERROR:", e, flush=True)
+                args = {}
 
-    # NORMAL RESPONSE
-    return jsonify({"reply": msg.content})
+            if tool_name == "get_time":
+                return jsonify({"reply": get_time()})
+
+            if tool_name == "web_search":
+                query = args.get("query", "")
+                return jsonify({"reply": web_search(query)})
+
+        # NORMAL RESPONSE
+        content = msg.content or "I couldn't generate a response."
+        return jsonify({"reply": content})
+
+    except Exception as e:
+        print("FATAL ERROR in /chat:", e, flush=True)
+        return jsonify({"reply": f"❌ Server error: {e}"}), 500
+
 
 @app.route("/")
 def home():
