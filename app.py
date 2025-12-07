@@ -6,7 +6,6 @@ from openai import OpenAI
 app = Flask(__name__)
 CORS(app)
 
-# Make sure OPENAI_API_KEY is set in Railway
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SYSTEM_PROMPT = """
@@ -72,29 +71,38 @@ TOOLS = [
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    """
+    Always returns 200 with a 'reply' field.
+    Any internal error is sent back as text instead of crashing.
+    """
     try:
         data = request.get_json(force=True, silent=True) or {}
-        user_msg = data.get("message", "").trim() if hasattr(str, "trim") else data.get("message", "").strip()
+        user_msg = (data.get("message") or "").strip()
         print("INCOMING MESSAGE:", user_msg, flush=True)
 
         if not user_msg:
-            return jsonify({"reply": "Please type a message."})
+            return jsonify({ "reply": "Please type a message." })
 
-        response = client.chat.completions.create(
-            model="gpt-5.1",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg}
-            ],
-            tools=TOOLS,
-            tool_choice="auto"
-        )
+        # Call OpenAI
+        try:
+            response = client.chat.completions.create(
+                model="gpt-5.1",
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_msg}
+                ],
+                tools=TOOLS,
+                tool_choice="auto"
+            )
+        except Exception as e:
+            print("OPENAI ERROR:", e, flush=True)
+            return jsonify({ "reply": f"❌ OpenAI error: {e}" })
 
         msg = response.choices[0].message
         print("RAW OPENAI MESSAGE:", msg, flush=True)
 
         # TOOL CALL
-        if msg.tool_calls:
+        if getattr(msg, "tool_calls", None):
             tool_call = msg.tool_calls[0]
             tool_name = tool_call.function.name
             args_str = tool_call.function.arguments or "{}"
@@ -104,22 +112,26 @@ def chat():
                 args = json.loads(args_str)
             except Exception as e:
                 print("ARGS PARSE ERROR:", e, flush=True)
-                args = {}
+                return jsonify({ "reply": f"❌ Tool args parse error: {e}" })
 
             if tool_name == "get_time":
-                return jsonify({"reply": get_time()})
+                return jsonify({ "reply": get_time() })
 
             if tool_name == "web_search":
                 query = args.get("query", "")
-                return jsonify({"reply": web_search(query)})
+                return jsonify({ "reply": web_search(query) })
+
+            # Unknown tool
+            return jsonify({ "reply": f"❌ Unknown tool requested: {tool_name}" })
 
         # NORMAL RESPONSE
         content = msg.content or "I couldn't generate a response."
-        return jsonify({"reply": content})
+        return jsonify({ "reply": content })
 
     except Exception as e:
+        # Last-resort catch: never 500, just show the error
         print("FATAL ERROR in /chat:", e, flush=True)
-        return jsonify({"reply": f"❌ Server error: {e}"}), 500
+        return jsonify({ "reply": f"❌ Server error: {e}" })
 
 
 @app.route("/")
