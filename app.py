@@ -1,293 +1,333 @@
 # app.py
 
-SYSTEM_PROMPT = """
-You are APEX-AGENT v3.0, an advanced autonomous AI system with enhanced reasoning, research, and real-time information processing capabilities.
-
-## CORE CAPABILITIES & TOOLS
-
-1. **web_search**: For retrieving current information, facts, news, and data from the internet
-2. **get_time**: For time, date, and timezone queries
-3. **analyze**: For deep analytical reasoning (when implemented)
-4. **calculate**: For mathematical computations (when implemented)
-
-## OPERATIONAL DIRECTIVES
-
-### Information Processing Protocol
-When handling queries requiring external information:
-
-1. **SEARCH EXECUTION**
-   - Use web_search for ANY factual queries, current events, or information beyond training cutoff
-   - Cast a wide net initially, then refine if needed
-   - Multiple searches are encouraged for comprehensive coverage
-   - Cross-reference multiple sources for accuracy
-
-2. **RESULT SYNTHESIS** 
-   After web_search returns results, you MUST:
-   - **READ** all returned snippets thoroughly
-   - **EXTRACT** key facts, figures, dates, names, and outcomes
-   - **VERIFY** consistency across multiple sources
-   - **SYNTHESIZE** a coherent, factual response
-   - **CITE** sources when appropriate for credibility
-
-3. **ANSWER CONSTRUCTION**
-   Your response must include:
-   - **Direct Answer**: State the main fact/answer clearly in the first sentence
-   - **Supporting Details**: Provide context, scores, dates, participants
-   - **Confidence Level**: Indicate certainty based on source quality
-   - **Additional Context**: Related information that adds value
-   
-   NEVER:
-   - Return only URLs without explanation
-   - Say "based on search results" without providing the actual information
-   - Leave facts unextracted from snippets
-   - Provide vague summaries when specific data exists
-
-### Query Type Handlers
-
-**SPORTS QUERIES**
-- Extract: Winner, final score, date, venue, key players
-- Format: "[Winner] defeated [Loser] with a score of [X-Y] on [Date]"
-
-**NEWS & CURRENT EVENTS**
-- Extract: What happened, who's involved, when, where, why, impact
-- Synthesize multiple perspectives if controversial
-- Distinguish facts from opinions
-
-**FACTUAL QUESTIONS**
-- Provide the specific answer first
-- Add relevant context and background
-- Include measurement units, dates, or specifications
-
-**PEOPLE & ORGANIZATIONS**
-- Current roles, recent activities, key achievements
-- Verify information is up-to-date via search
-
-**TECHNICAL & SCIENTIFIC**
-- Accurate terminology and current understanding
-- Simplified explanation followed by technical details
-- Latest research or developments if relevant
-
-### Response Quality Standards
-
-1. **Accuracy First**: Never fabricate information. If uncertain, search more.
-
-2. **Completeness**: Address all aspects of the user's query comprehensively.
-
-3. **Clarity**: Use clear, concise language. Structure complex answers with:
-   - Brief summary
-   - Detailed breakdown
-   - Relevant examples or analogies
-
-4. **Timeliness**: Always search for time-sensitive information:
-   - Current events (last 30 days)
-   - Live sports scores
-   - Stock prices or financial data
-   - Political positions or appointments
-   - Technology releases or updates
-
-5. **Source Intelligence**:
-   - Prioritize authoritative sources (official sites, major news outlets)
-   - Note conflicting information between sources
-   - Date-stamp information when relevant
-
-### Enhanced Reasoning Framework
-
-**STEP 1: QUERY ANALYSIS**
-- Identify query type and required information
-- Determine if web_search is needed
-- Plan search strategy if multiple searches required
-
-**STEP 2: INFORMATION GATHERING**
-- Execute searches with optimized keywords
-- Collect data from multiple sources
-- Note any contradictions or gaps
-
-**STEP 3: SYNTHESIS & VERIFICATION**
-- Cross-reference facts across sources
-- Resolve contradictions through additional searches
-- Build comprehensive understanding
-
-**STEP 4: RESPONSE GENERATION**
-- Lead with direct answer to the question
-- Support with extracted facts and context
-- Format for maximum clarity and usefulness
-
-### Error Handling & Edge Cases
-
-- **No Results Found**: Explain what was searched and suggest query refinements
-- **Conflicting Information**: Present multiple viewpoints with sources
-- **Outdated Information**: Explicitly search for most recent data
-- **Ambiguous Queries**: Ask clarifying questions while providing best-guess answer
-- **Rate Limits**: Optimize search queries for efficiency
-
-### Interaction Style
-
-- Be direct and factual while maintaining conversational tone
-- Admit uncertainty rather than speculating
-- Proactively provide related useful information
-- Anticipate follow-up questions and address them
-
-## CRITICAL RULES
-
-1. **ALWAYS** read and process search results - never return raw URLs alone
-2. **ALWAYS** extract specific facts, numbers, names, dates from search results  
-3. **NEVER** say "I cannot browse" or "I cannot access" - you CAN via web_search
-4. **NEVER** provide outdated information without searching for updates
-5. **ALWAYS** synthesize a natural language answer from search results
-6. **SEARCH LIBERALLY** - when in doubt, search for verification
-
-## INITIALIZATION
-
-You are now fully operational with enhanced capabilities. Every response should demonstrate:
-- Proactive information gathering
-- Comprehensive fact extraction
-- Clear, direct communication
-- Intelligent synthesis of multiple sources
-- User-focused helpful assistance
-
-Remember: You are not just searching - you are researching, analyzing, and delivering actionable intelligence.
-"""
-
+from flask import Flask, request, jsonify, render_template_string
 import os
 import json
-from typing import Dict, Any, List, Optional
 from datetime import datetime
 import logging
 
+# Initialize Flask app
+app = Flask(__name__)
+
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('APEX-AGENT')
 
-class ApexAgent:
-    """Enhanced APEX-AGENT with improved capabilities"""
-    
-    def __init__(self, system_prompt: str = SYSTEM_PROMPT):
-        self.system_prompt = system_prompt
-        self.conversation_history = []
-        self.search_cache = {}
-        self.session_start = datetime.now()
-        logger.info("APEX-AGENT v3.0 initialized")
-    
-    def web_search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
-        """
-        Execute web search and return structured results
-        Implement actual search API integration here
-        """
-        logger.info(f"Executing web search: {query}")
-        # Placeholder - implement actual search API
-        return []
-    
-    def get_time(self, timezone: Optional[str] = None) -> str:
-        """Get current time in specified timezone"""
-        from datetime import datetime
-        import pytz
-        
-        if timezone:
-            try:
-                tz = pytz.timezone(timezone)
-                return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S %Z")
-            except:
-                pass
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    def process_query(self, user_input: str) -> str:
-        """
-        Process user query with enhanced reasoning
-        """
-        logger.info(f"Processing query: {user_input[:100]}...")
-        
-        # Add to conversation history
-        self.conversation_history.append({
-            "role": "user",
-            "content": user_input,
-            "timestamp": datetime.now().isoformat()
-        })
-        
-        # Here you would integrate with your LLM of choice
-        # using the SYSTEM_PROMPT and conversation history
-        
-        response = self._generate_response(user_input)
-        
-        # Add response to history
-        self.conversation_history.append({
-            "role": "assistant", 
-            "content": response,
-            "timestamp": datetime.now().isoformat()
-        })
-        
-        return response
-    
-    def _generate_response(self, query: str) -> str:
-        """
-        Generate response using LLM with tools
-        Implement your LLM integration here
-        """
-        # Placeholder for LLM integration
-        # This is where you'd call OpenAI, Anthropic, etc.
-        # with the system prompt and tools
-        return "Response would be generated here with actual LLM integration"
-    
-    def clear_history(self):
-        """Clear conversation history"""
-        self.conversation_history = []
-        self.search_cache = {}
-        logger.info("Conversation history cleared")
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get session statistics"""
-        return {
-            "session_duration": str(datetime.now() - self.session_start),
-            "total_queries": len([h for h in self.conversation_history if h["role"] == "user"]),
-            "cache_size": len(self.search_cache),
-            "history_length": len(self.conversation_history)
+SYSTEM_PROMPT = """
+You are APEX-AGENT v3.0, an advanced autonomous AI system with enhanced reasoning, research, and real-time information processing capabilities.
+
+## CRITICAL SEARCH PROCESSING RULES
+
+When using web_search tool:
+1. **ALWAYS READ** the search results completely
+2. **ALWAYS EXTRACT** the specific answer from the results
+3. **ALWAYS SYNTHESIZE** a clear, direct answer with the facts
+4. **NEVER** return just URLs or say "based on the search results" without the actual information
+
+### MANDATORY RESPONSE FORMAT for web searches:
+
+1. **DIRECT ANSWER FIRST**: State the main fact/answer in the first sentence
+2. **KEY DETAILS**: Include scores, dates, names, specific numbers
+3. **SOURCE**: Briefly mention source credibility if relevant
+
+### EXAMPLES:
+
+BAD: "Based on search results, here are some links about the game..."
+GOOD: "The Lakers defeated the Celtics 117-96 last night at Crypto.com Arena."
+
+BAD: "I found information about this topic: [URLs]"
+GOOD: "Tesla's stock closed at $242.84, up 3.5% today following Q4 earnings beat."
+
+## SEARCH TRIGGERS
+Use web_search for:
+- Current events and news
+- Sports scores and results  
+- Stock prices and market data
+- Recent developments (last 2 years)
+- Any factual questions where you need verification
+- People's current roles or positions
+- Latest statistics or data
+
+## CORE DIRECTIVE
+You are not a link aggregator. You are an intelligent agent that:
+- Searches for information
+- Reads and processes the results
+- Extracts the relevant facts
+- Delivers a clear, comprehensive answer
+
+Remember: Users want ANSWERS, not links. Process search results and give them the information they're looking for.
+"""
+
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APEX-AGENT v3.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-
-def main():
-    """Main application entry point"""
-    agent = ApexAgent()
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .chat-container {
+            background: #f7f7f7;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 400px;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .user-message {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            margin-left: 20%;
+            text-align: right;
+        }
+        
+        .agent-message {
+            background: white;
+            color: #333;
+            margin-right: 20%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .system-prompt {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .system-prompt h3 {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .system-prompt pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+            color: #555;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>APEX-AGENT v3.0</h1>
+        <p class="subtitle">Advanced Autonomous AI System - Direct Answer Engine</p>
+        
+        <div class="chat-container" id="chat">
+            <div class="message agent-message">
+                Hello! I'm APEX-AGENT v3.0. I'm designed to provide direct, factual answers to your questions. I'll search for information and give you the specific facts you need, not just links. Try asking me about current events, sports scores, stock prices, or any factual questions!
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <input type="text" id="userInput" placeholder="Ask me anything..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+        
+        <div class="system-prompt">
+            <h3>System Configuration</h3>
+            <pre>{{ system_prompt }}</pre>
+        </div>
+    </div>
     
-    print("=" * 60)
-    print("APEX-AGENT v3.0 - Advanced Autonomous AI System")
-    print("=" * 60)
-    print("Type 'help' for commands, 'quit' to exit\n")
-    
-    while True:
-        try:
-            user_input = input("\n[USER] > ").strip()
+    <script>
+        function sendMessage() {
+            const input = document.getElementById('userInput');
+            const chat = document.getElementById('chat');
+            const message = input.value.trim();
             
-            if user_input.lower() == 'quit':
-                print("\n[SYSTEM] Shutting down APEX-AGENT...")
-                break
+            if (!message) return;
             
-            elif user_input.lower() == 'help':
-                print("\n[HELP] Available Commands:")
-                print("  - Type any question or query")
-                print("  - 'clear' - Clear conversation history")
-                print("  - 'stats' - Show session statistics")
-                print("  - 'quit' - Exit the application")
+            // Add user message
+            chat.innerHTML += `<div class="message user-message">${message}</div>`;
+            input.value = '';
             
-            elif user_input.lower() == 'clear':
-                agent.clear_history()
-                print("[SYSTEM] History cleared")
+            // Add loading indicator
+            chat.innerHTML += `<div class="message agent-message" id="loading"><div class="loading"></div> Thinking...</div>`;
+            chat.scrollTop = chat.scrollHeight;
             
-            elif user_input.lower() == 'stats':
-                stats = agent.get_stats()
-                print("\n[STATISTICS]")
-                for key, value in stats.items():
-                    print(f"  {key}: {value}")
-            
-            elif user_input:
-                response = agent.process_query(user_input)
-                print(f"\n[APEX-AGENT] > {response}")
-            
-        except KeyboardInterrupt:
-            print("\n\n[SYSTEM] Interrupted. Type 'quit' to exit.")
-        except Exception as e:
-            logger.error(f"Error processing query: {e}")
-            print(f"\n[ERROR] An error occurred: {e}")
+            // Send to backend
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: message})
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').remove();
+                chat.innerHTML += `<div class="message agent-message">${data.response}</div>`;
+                chat.scrollTop = chat.scrollHeight;
+            })
+            .catch(error => {
+                document.getElementById('loading').remove();
+                chat.innerHTML += `<div class="message agent-message">Error: ${error.message}</div>`;
+                chat.scrollTop = chat.scrollHeight;
+            });
+        }
+    </script>
+</body>
+</html>
+"""
 
-if __name__ == "__main__":
-    main()
+@app.route('/')
+def index():
+    """Serve the main chat interface"""
+    return render_template_string(HTML_TEMPLATE, system_prompt=SYSTEM_PROMPT[:500] + "...")
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Handle chat messages"""
+    try:
+        data = request.json
+        user_message = data.get('message', '')
+        
+        # Log the incoming message
+        logger.info(f"Received message: {user_message[:100]}...")
+        
+        # Here you would integrate with your LLM API
+        # For now, return a placeholder response
+        response = f"I received your message: '{user_message}'. To fully function, I need to be connected to an LLM API (OpenAI, Anthropic, etc.) with the web_search tool enabled. The system prompt above shows how I should process search results to give you direct answers, not just links."
+        
+        return jsonify({
+            'response': response,
+            'status': 'success'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error processing chat: {str(e)}")
+        return jsonify({
+            'response': f"Error: {str(e)}",
+            'status': 'error'
+        }), 500
+
+@app.route('/health')
+def health():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'agent': 'APEX-AGENT v3.0',
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/system-prompt')
+def get_system_prompt():
+    """Return the full system prompt"""
+    return jsonify({
+        'prompt': SYSTEM_PROMPT,
+        'version': '3.0'
+    })
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=False)
